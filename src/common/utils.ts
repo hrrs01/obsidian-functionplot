@@ -106,21 +106,52 @@ export function toFunctionPlotOptions(
         options.yAxis.domain.max ?? FALLBACK_PLOT_INPUTS.yAxis.domain.max,
       ],
     },
+    tip: {xLine: false, yLine: false, renderer(x, y, index) {
+      // Purely cosmetic change
+      return ((options.data[index].name) + " " || " ") + "( x: "+x.toFixed(3)+", y: "+y.toFixed(3)+" )";
+    }},
+
     plugins: [(chart: Chart) => {
+      // if legends are not enabled, do not display them
       if(!options.legends) return;
-      chart.root.append("text").attr("class", "top-left-legend");
-      let text_color = "#00ff00";
+
+      // create a text svg element in the root function-plot element
+      chart.root.append("g").attr("class", "top-left-legend");
+
+      // Start organizing the data properly
       let legends: {name: string, color: string}[] = [];
       chart.options.data?.forEach((datum, index, arr) => {
         legends.push({name: (options.data[index].name) || "", color: datum.color || ""});
       })
+
+      // Select the legend element, and place it accordingly to the top-right-legend.
       const tll: any = chart.root.select(".top-left-legend");
-      console.log(legends);
-      tll.selectAll("tspan").remove();
+      tll.attr("transform", "translate("+ (chart.meta.margin?.left || 10) + ","+ ((chart.meta.margin?.top || 20) / 2) +")")
+
+      // This is sort of a bugfix, so that the legends dont add up during the make-plot-modal
+      tll.selectAll("text").remove();
+
+      // We use rows, to make sure that if we have too many legends in a row, 
+      // to make sure it dosent overlap with the title
+      let rows: any[] = [];
+      let current_row = -1;
+
       legends.forEach((legend, index, arr) => {
-        tll.attr("y", (chart.meta.margin?.top || 20) / 2)
-           .attr("x", chart.meta.margin?.left || 10)
-        tll.append("tspan").attr('fill', legend.color).text("█ " + legend.name + "\n");;
+
+        if(index % 4 == 0){
+          rows = rows.map((r, i, a) => {
+            const dy = r.attr("dy");
+            r.attr("dy", dy);
+          })
+          current_row += 1;
+          rows.push(tll.append("text").attr("dx",0).attr("dy", current_row * 15));
+          
+        }
+
+        rows[current_row].append("tspan").attr('fill', legend.color).attr("dx", 5).text("█ " + legend.name + "\n");
+        
+        
+
       }) 
     }],
     grid: options.grid ?? undefined,
@@ -152,6 +183,7 @@ export function hueToHexRGB(hue: number): string {
     ].join("")
   );
 }
+
 
 /**
  * Insert the text as a new paragraph (newline before and after), and place the active cursor below.
